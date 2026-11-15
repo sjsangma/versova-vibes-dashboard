@@ -19,6 +19,8 @@ function kpiCard(o) {
 }
 
 function viewOverview(root) {
+  // A KPI only shows a change when an earlier period actually exists in the data.
+  const cmp = (cur, prev) => (prev == null ? '' : deltaPill(deltaOf(cur, prev)));
   const t = totals();
   const prev = previousPeriod();
   const pt = prev ? totals(prev.from, prev.to) : null;
@@ -78,22 +80,22 @@ function viewOverview(root) {
   root.innerHTML = `
   <section class="kpis">
     ${kpiCard({label: 'Total net sales', value: inr0(t.net), icon: 'rupee', tone: 'gold',
-      delta: deltaPill(deltaOf(t.net, pt && pt.net)), spark: spark(sparkNet)})}
+      delta: cmp(t.net, pt && pt.net), spark: spark(sparkNet)})}
     ${kpiCard({label: 'Gross sales', value: inr0(t.gross), icon: 'trend',
-      delta: deltaPill(deltaOf(t.gross, pt && pt.gross)), spark: spark(sparkGross, 'var(--teal)')})}
+      delta: cmp(t.gross, pt && pt.gross), spark: spark(sparkGross, 'var(--teal)')})}
     ${kpiCard({label: 'Total orders', value: num(t.bills), icon: 'cart',
-      delta: deltaPill(deltaOf(t.bills, pt && pt.bills)), spark: spark(sparkBills, 'var(--good)')})}
+      delta: cmp(t.bills, pt && pt.bills), spark: spark(sparkBills, 'var(--good)')})}
     ${kpiCard({label: 'Average order value', value: inr2(t.avg), icon: 'rupee',
-      delta: deltaPill(deltaOf(t.avg, pt && pt.avg))})}
+      delta: cmp(t.avg, pt && pt.avg)})}
     ${kpiCard({label: 'Food cost %', value: pct(t.cost_pct), icon: 'costing',
-      delta: deltaPill(deltaOf(t.cost_pct, pt && pt.cost_pct)), spark: spark(costByDay, 'var(--warn)'),
+      delta: cmp(t.cost_pct, pt && pt.cost_pct), spark: spark(costByDay, 'var(--warn)'),
       note: t.cost_pct > 30 ? 'above 30% target' : 'within target'})}
     ${kpiCard({label: 'Inventory valuation', value: inr0(inv.stock_value), icon: 'box',
       note: inv.ingredients + ' ingredients · physical stock'})}
     ${kpiCard({label: 'Staff attendance', value: pct(attPct, 1), icon: 'staff',
-      delta: deltaPill(deltaOf(attPct, pAttPct)), note: num(att.length) + ' records'})}
+      delta: cmp(attPct, pAttPct), note: num(att.length) + ' records'})}
     ${kpiCard({label: 'Customer average rating', value: avgRating.toFixed(2) + ' ★', icon: 'star',
-      delta: deltaPill(deltaOf(avgRating, pRating)), note: num(rev.length) + ' reviews'})}
+      delta: cmp(avgRating, pRating), note: num(rev.length) + ' reviews'})}
   </section>
 
   <section class="grid split" style="margin-bottom:14px">

@@ -56,7 +56,8 @@ function renderNav() {
   $('#nav').innerHTML = NAV.map((n) => {
     if (n.group) return `<div class="nav-group">${esc(n.group)}</div>`;
     const active = state.route === n.route ? ' active' : '';
-    return `<a class="nav-link${active}" href="#/${n.route}" data-route="${n.route}">
+    return `<a class="nav-link${active}" href="#/${n.route}" data-route="${n.route}"
+      data-label="${esc(n.label)}"${active ? ' aria-current="page"' : ''}>
       ${ico(n.icon)}<span>${esc(n.label)}</span></a>`;
   }).join('');
 }
@@ -230,7 +231,13 @@ function applyRoute(hash) {
   state.route = ROUTES[route] ? route : 'overview';
   state.q = $('#tableSearch').value = '';
   render();
-  if (window.innerWidth <= 980) document.body.classList.remove('nav-open');
+  const root = $('#viewRoot');
+  if (root) {
+    root.classList.remove('view-enter');
+    void root.offsetWidth;          // restart the entrance animation on each navigation
+    root.classList.add('view-enter');
+  }
+  if (window.innerWidth <= 1024) document.body.classList.remove('nav-open');
 }
 
 function wireShell() {
@@ -312,6 +319,23 @@ function wireShell() {
     render();
   });
   $('#exportBtn').addEventListener('click', exportMenu);
+  const sideBtn = $('#sideBtn');
+  const applySide = (collapsed) => {
+    document.body.classList.toggle('side-collapsed', collapsed);
+    if (!sideBtn) return;
+    const label = collapsed ? 'Expand navigation' : 'Collapse navigation';
+    sideBtn.setAttribute('aria-expanded', String(!collapsed));
+    sideBtn.setAttribute('aria-label', label);
+    sideBtn.title = label;
+  };
+  if (sideBtn) {
+    sideBtn.addEventListener('click', () => {
+      const collapsed = !document.body.classList.contains('side-collapsed');
+      applySide(collapsed);
+      localStorage.setItem('vv.side', collapsed ? 'collapsed' : 'open');
+    });
+    applySide(localStorage.getItem('vv.side') === 'collapsed');
+  }
   $('#menuBtn').addEventListener('click', () => {
     const open = document.body.classList.toggle('nav-open');
     $('#menuBtn').setAttribute('aria-expanded', String(open));

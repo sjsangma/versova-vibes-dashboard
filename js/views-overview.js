@@ -77,7 +77,32 @@ function viewOverview(root) {
       route: 'reviews', tone: 'warn', icon: 'star'},
   ];
 
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const today = new Date().toLocaleDateString('en-IN',
+    {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'});
+  const pills = [];
+  if (inv.items_to_reorder) pills.push(`<a class="h-pill bad" href="#/inventory">
+    <i></i>${num(inv.items_to_reorder)} items to reorder</a>`);
+  if (D.hygiene_summary.overdue_actions) pills.push(`<a class="h-pill bad" href="#/hygiene">
+    <i></i>${num(D.hygiene_summary.overdue_actions)} overdue CAPA</a>`);
+  if (D.review_summary.pending_replies) pills.push(`<a class="h-pill warn" href="#/reviews">
+    <i></i>${num(D.review_summary.pending_replies)} reviews awaiting reply</a>`);
+  if (D.expiry.length) pills.push(`<a class="h-pill warn" href="#/inventory">
+    <i></i>${num(D.expiry.length)} in expiry window</a>`);
+  if (!pills.length) pills.push(`<span class="h-pill good"><i></i>All monitored registers clear</span>`);
+
   root.innerHTML = `
+  <section class="hero">
+    <span class="h-ico"><svg class="spin-slow d2" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 3v18h18"/><path d="m7 15 4-5 3 3 5-7"/></svg></span>
+    <div class="h-copy">
+      <h2>${greeting}, ${esc(state.role)}</h2>
+      <div class="h-date">${esc(today)} · ${dateLong(state.from)} – ${dateLong(state.to)}</div>
+      <div class="h-pills">${pills.join('')}</div>
+    </div>
+    <span class="badge gold">Synthetic data</span>
+  </section>
   <section class="kpis">
     ${kpiCard({label: 'Total net sales', value: inr0(t.net), icon: 'rupee', tone: 'gold',
       delta: cmp(t.net, pt && pt.net), spark: spark(sparkNet)})}

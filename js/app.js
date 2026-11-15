@@ -26,6 +26,9 @@ const NAV = [
     sub: 'Checklists, temperature logs, CAPA and licence dates'},
   {route: 'marketing', label: 'Marketing', icon: 'marketing', view: viewMarketing,
     sub: 'Campaigns, content calendar and engagement'},
+  {group: 'Workspace'},
+  {route: 'notes', label: 'Notes Studio', icon: 'notes', view: viewNotes,
+    sub: 'Working notes whose patterns are generated from their own text'},
   {group: 'Reporting'},
   {route: 'reports', label: 'Reports', icon: 'reports', view: viewReports,
     sub: 'Profit and loss, period comparison and downloads'},
@@ -95,6 +98,149 @@ function closePanels() {
   $('#searchResults').classList.remove('open');
   $('#bellBtn').setAttribute('aria-expanded', 'false');
   $('#profileBtn').setAttribute('aria-expanded', 'false');
+  ['#moodBtn', '#soundBtn'].forEach((sel) => {
+    const b = $(sel);
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+
+/* ---------- visual moods, notes and opt-in sound ---------- */
+function renderMoodGrid() {
+  const grid = $('#moodGrid');
+  if (!grid) return;
+  const now = currentMood();
+  grid.innerHTML = MOOD_ORDER.map((k) => {
+    const m = MOODS[k];
+    const on = k === now;
+    return `<button class="mood-card${on ? ' active' : ''}" data-mood="${esc(k)}"
+      aria-pressed="${on}" title="${esc(m.note)}">
+      <span class="mood-dot" style="background:radial-gradient(circle at 32% 26%,${m.swatch[1]},
+        ${m.swatch[0]});color:${m.css.a}" aria-hidden="true"></span>
+      <span><b>${esc(m.label)}</b><span>${esc(m.note)}</span></span></button>`;
+  }).join('');
+}
+
+function syncSoundPanel() {
+  const st = Sound.state();
+  const set = (sel, on) => { const el = $(sel); if (el) el.setAttribute('aria-checked', String(on)); };
+  set('#soundToggle', st.enabled);
+  set('#soundAmbient', st.ambient);
+  set('#soundUi', st.ui);
+  const vol = $('#soundVolume');
+  if (vol) vol.value = String(st.volume);
+  const wave = $('#soundWave');
+  if (wave) wave.style.opacity = st.enabled && !st.muted ? '1' : '0';
+  const btn = $('#soundBtn');
+  if (btn) btn.setAttribute('aria-label', st.enabled ? 'Sound: on' : 'Sound: off');
+}
+
+function placePopover(btn, panel) {
+  panel.style.left = '0px';
+  panel.style.right = 'auto';
+  panel.style.top = Math.round(btn.getBoundingClientRect().bottom + 10) + 'px';
+  const w = panel.getBoundingClientRect().width;
+  const r = btn.getBoundingClientRect();
+  const left = Math.max(12, Math.min(Math.round(r.left), window.innerWidth - w - 12));
+  panel.style.left = Math.round(left) + 'px';
+}
+
+function wireAtmosphere() {
+  applyMood(savedMood(), {persist: false});
+  renderMoodGrid();
+  Atmo.init();
+  syncSoundPanel();
+
+  const moodBtn = $('#moodBtn');
+  if (moodBtn) {
+    moodBtn.addEventListener('click', () => {
+      const wasOpen = $('#moodPanel').classList.contains('open');
+      closePanels();
+      if (!wasOpen) {
+        $('#moodPanel').classList.add('open');
+        moodBtn.setAttribute('aria-expanded', 'true');
+        placePopover(moodBtn, $('#moodPanel'));
+        Sound.play('open');
+      }
+    });
+  }
+
+  const grid = $('#moodGrid');
+  if (grid) {
+    grid.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-mood]');
+      if (!b) return;
+      const key = applyMood(b.dataset.mood);
+      renderMoodGrid();
+      Atmo.ripple(window.innerWidth * 0.72, 110, {hue: MOODS[key].hues[0], max: 300});
+      Sound.play('select');
+      toast(MOODS[key].label + ' mood applied');
+    });
+  }
+
+  const soundBtn = $('#soundBtn');
+  if (soundBtn) {
+    soundBtn.addEventListener('click', () => {
+      const wasOpen = $('#soundPanel').classList.contains('open');
+      closePanels();
+      if (!wasOpen) {
+        syncSoundPanel();
+        $('#soundPanel').classList.add('open');
+        soundBtn.setAttribute('aria-expanded', 'true');
+        placePopover(soundBtn, $('#soundPanel'));
+      }
+    });
+  }
+
+  const toggle = $('#soundToggle');
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      if (Sound.enabled) { Sound.disable(); toast('Sound off'); }
+      else { Sound.enable(); toast('Sound on — ambient pad only'); }
+      syncSoundPanel();
+    });
+  }
+  const amb = $('#soundAmbient');
+  if (amb) amb.addEventListener('click', () => {
+    Sound.setAmbient(!Sound.prefs.ambient);
+    syncSoundPanel();
+  });
+  const ui = $('#soundUi');
+  if (ui) ui.addEventListener('click', () => {
+    Sound.setUi(!Sound.prefs.ui);
+    syncSoundPanel();
+    Sound.play('tap');
+  });
+  const vol = $('#soundVolume');
+  if (vol) vol.addEventListener('input', () => Sound.setVolume(vol.value));
+
+  const notesBtn = $('#notesBtn');
+  if (notesBtn) notesBtn.addEventListener('click', () => {
+    if (state.route === 'notes') render(); else location.hash = '#/notes';
+    Sound.play('open');
+  });
+
+  /* Cursor trail and click ripples. Both are pointer-priced and fully passive. */
+  let lastMove = 0;
+  document.addEventListener('pointermove', (e) => {
+    const now = performance.now();
+    if (now - lastMove < 42) return;
+    lastMove = now;
+    if (e.pointerType === 'mouse') Atmo.trail(e.clientX, e.clientY);
+  }, {passive: true});
+  document.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    Atmo.ripple(e.clientX, e.clientY, {max: 170});
+    if (e.target.closest('a, button, .kpi, .chip')) Sound.play('tap');
+  }, {passive: true});
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-link')) Sound.play('open');
+  });
+  const main = $('#main');
+  if (main) {
+    main.addEventListener('click', (e) => {
+      if (e.target.closest('.kpi')) { Atmo.pulse(); Atmo.ripple(e.clientX, e.clientY, {max: 240}); }
+    });
+  }
 }
 
 function renderNotifications() {
@@ -221,6 +367,10 @@ function render() {
   const root = $('#viewRoot');
   root.onclick = null;
   def.view(root);
+  if (typeof Atmo !== 'undefined') {
+    const now = Date.now();
+    if (now - (render.lastPulse || 0) > 900) { render.lastPulse = now; Atmo.pulse(); }
+  }
   window.scrollTo({top: 0, behavior: 'instant'});
   document.title = `${def.label} · ${D.business}`;
 }
@@ -345,7 +495,7 @@ function wireShell() {
     closePanels();
   });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.popover, #bellBtn, #profileBtn, .searchbox, #searchResults')) {
+    if (!e.target.closest('.popover, #bellBtn, #profileBtn, #moodBtn, #soundBtn, .searchbox, #searchResults')) {
       closePanels();
     }
   });
@@ -373,6 +523,7 @@ function boot() {
   }
   renderNotifications();
   wireShell();
+  wireAtmosphere();
   const route = location.hash ? location.hash
     : '#/' + (localStorage.getItem('vv.landing') || 'overview');
   applyRoute(route);
